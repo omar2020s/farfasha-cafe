@@ -276,7 +276,7 @@ def admin():
             WHERE order_id = ?
         """, (order["id"],))
 
-        items = cur.fetchall()
+        items = [dict(item) for item in cur.fetchall()]
 
         orders.append({
             "id": order["id"],
@@ -284,7 +284,7 @@ def admin():
             "total": order["total"],
             "status": order["status"],
             "created_at": order["created_at"],
-            "items": items
+            "order_items": items
         })
 
     today = datetime.now().strftime("%Y-%m-%d")
@@ -1259,8 +1259,8 @@ ADMIN_HTML = """
                     <td>{{ order.table_number }}</td>
                     <td>{{ order.created_at }}</td>
                     <td>
-                        {% for item in order.items %}
-                            {{ item.item_name }} × {{ item.qty }}<br>
+                        {% for item in order.order_items %}
+                             {{ item["item_name"] }} × {{ item["qty"] }}<br>
                         {% endfor %}
                     </td>
                     <td>{{ order.total }} جنيه</td>
