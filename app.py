@@ -551,11 +551,105 @@ HOME_HTML = r'''
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 :root{--brown:#5b2b12;--brown2:#7a3d1d;--dark:#1e0f08;--cream:#fffaf4;--paper:#fff;--muted:#84756b;--line:#eaded5;--shadow:0 14px 45px rgba(70,35,15,.10)}*{box-sizing:border-box}body{margin:0;font-family:'Cairo',Tahoma,sans-serif;background:linear-gradient(180deg,#fffaf4,#f5eee7);color:#20120a;padding-bottom:96px}.wrap{max-width:980px;margin:0 auto;padding:14px}.header{position:sticky;top:0;z-index:50;background:rgba(255,250,244,.96);backdrop-filter:blur(18px);padding:12px 14px;border-bottom:1px solid rgba(91,43,18,.08);display:flex;align-items:center;justify-content:space-between}.icon-btn{width:46px;height:46px;border:0;background:#fff;border-radius:17px;box-shadow:0 8px 25px rgba(70,35,15,.08);font-size:23px;position:relative}.header h1{margin:0;font-size:23px;font-weight:900}.count{position:absolute;top:-4px;right:-4px;background:var(--brown);color:#fff;border-radius:99px;min-width:22px;height:22px;font-size:12px;display:grid;place-items:center}.hero{margin-top:14px;border-radius:28px;min-height:235px;background:linear-gradient(90deg,rgba(18,9,5,.98),rgba(42,20,10,.58)),url('https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=1400') center/cover;box-shadow:var(--shadow);padding:26px;color:#fff;display:flex;align-items:center;justify-content:flex-end}.hero h2{font-size:32px;margin:8px 0 8px}.tabs{display:flex;gap:12px;overflow:auto;padding:15px 0;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.tab{min-width:110px;height:82px;border:1px solid var(--line);background:#fff;border-radius:18px;box-shadow:0 8px 22px rgba(70,35,15,.07);font-weight:900;color:#3c2516}.tab.active{background:linear-gradient(135deg,#6f3516,#3f1c0a);color:#fff}.products{display:flex;flex-direction:column;gap:14px}.product{background:#fff;border-radius:22px;box-shadow:0 12px 35px rgba(70,35,15,.08);display:grid;grid-template-columns:140px 1fr;overflow:hidden}.photo{height:150px}.photo img{width:100%;height:100%;object-fit:cover}.info{padding:12px}.info h3{font-size:20px;margin:0 0 4px}.desc{font-size:12px;color:var(--muted);margin:0 0 10px}.bottom{display:flex;justify-content:space-between;gap:6px;align-items:center}.price{font-weight:900;color:var(--brown2)}.qty{display:flex;gap:6px;align-items:center}.qty button,.add{border:0;border-radius:11px;height:32px;font-weight:900}.qty button{width:31px;background:#f1ebe5}.add{width:40px;background:linear-gradient(135deg,#6f3516,#3f1c0a);color:#fff}.drawer{position:fixed;left:12px;right:12px;bottom:12px;background:#fff;border-radius:24px;padding:14px;box-shadow:0 22px 70px rgba(50,24,10,.22);z-index:60}.summary{display:flex;align-items:center;justify-content:space-between}.send,.view{border:0;border-radius:15px;padding:12px 14px;font-family:inherit;font-weight:900}.send{background:linear-gradient(135deg,#6f3516,#3f1c0a);color:#fff}.view{background:#f3eee9}.cart-list{display:none;margin-top:10px;border-top:1px dashed #e7d9ce;padding-top:10px;max-height:50vh;overflow:auto}.cart-list.open{display:block}.form-box{margin-bottom:10px}.form-box label{font-weight:900;color:var(--brown);display:block;margin-bottom:6px}.form-box input,.form-box select{width:100%;border:1px solid var(--line);border-radius:15px;padding:12px;font-family:inherit;background:#fffaf6}.cart-item{display:grid;grid-template-columns:1fr 35px 75px 28px;gap:6px;padding:9px 0;border-bottom:1px dashed #eee}.remove{border:0;background:#fff0ed;color:#c0392b;border-radius:9px}.toast{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#20120a;color:#fff;padding:12px 18px;border-radius:16px;z-index:90;display:none}.menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:100;display:none}.menu-overlay.show{display:block}.mobile-menu{position:fixed;top:0;right:-310px;width:300px;height:100vh;background:linear-gradient(180deg,#241107,#100703);color:#fff;z-index:110;padding:24px;transition:.28s}.mobile-menu.show{right:0}.mobile-menu a{display:block;color:#fff;text-decoration:none;padding:15px;border-radius:16px;background:rgba(255,255,255,.08);margin-bottom:10px;font-weight:900}.close-menu{position:absolute;left:16px;top:16px;border:0;background:#fff;color:#5b2b12;width:42px;height:42px;border-radius:50%;font-size:28px}@media(min-width:900px){body{padding-bottom:0}.wrap{margin-right:280px;max-width:900px}.drawer{right:auto;left:22px;top:22px;bottom:auto;width:340px}.cart-list{display:block}.products{display:grid;grid-template-columns:1fr 1fr}.product{grid-template-columns:1fr}.photo{height:185px}.sidebar{display:block}.header{display:none}}
+
+/* ===== FIX: Desktop right sidebar for customer page ===== */
+.desktop-sidebar{
+    display:none;
+}
+@media(min-width:900px){
+    .desktop-sidebar{
+        display:block !important;
+        position:fixed !important;
+        top:22px !important;
+        right:22px !important;
+        bottom:22px !important;
+        width:245px !important;
+        background:linear-gradient(180deg,#241107,#100703) !important;
+        border-radius:28px !important;
+        color:#fff !important;
+        padding:22px !important;
+        box-shadow:0 14px 45px rgba(70,35,15,.18) !important;
+        z-index:80 !important;
+        overflow:auto !important;
+    }
+    .desktop-sidebar .brand-box{
+        margin-bottom:24px;
+    }
+    .desktop-sidebar h2{
+        color:#ffc17d;
+        margin:0 0 4px;
+        font-size:22px;
+        font-weight:900;
+    }
+    .desktop-sidebar p{
+        color:#c9b6a8;
+        margin:0 0 18px;
+        font-size:13px;
+    }
+    .desktop-sidebar a{
+        display:flex;
+        align-items:center;
+        gap:12px;
+        color:#fff;
+        text-decoration:none;
+        padding:14px;
+        border-radius:16px;
+        margin-bottom:8px;
+        font-weight:900;
+        background:rgba(255,255,255,.05);
+    }
+    .desktop-sidebar a.active,
+    .desktop-sidebar a:hover{
+        background:rgba(198,132,63,.30);
+    }
+    .desktop-sidebar .side-note{
+        margin-top:24px;
+        padding:14px;
+        border-radius:18px;
+        background:rgba(255,255,255,.07);
+        color:#e8d7c8;
+        line-height:1.8;
+        font-size:12px;
+    }
+    .wrap{
+        margin-right:290px !important;
+        margin-left:390px !important;
+        max-width:none !important;
+        width:auto !important;
+    }
+    .drawer{
+        position:fixed !important;
+        right:auto !important;
+        left:22px !important;
+        top:22px !important;
+        bottom:auto !important;
+        width:340px !important;
+        max-height:calc(100vh - 44px) !important;
+        overflow:auto !important;
+    }
+    .header{display:none !important;}
+}
+@media(max-width:899px){
+    .desktop-sidebar{display:none !important;}
+}
 </style>
 </head>
 <body>
 <div class="toast" id="toast"></div>
 <div class="menu-overlay" id="overlay"></div>
+
+<aside class="desktop-sidebar">
+    <div class="brand-box">
+        <h2>☕ كافيه فرفشة</h2>
+        <p>نكهة كل لحظة</p>
+    </div>
+    <a class="active" href="/">🏠 المنيو</a>
+    <a href="/login">📋 لوحة المدير</a>
+    <a href="{{ qr_url }}" target="_blank">▦ QR للطاولة</a>
+    <a href="#cartBox">🛒 السلة</a>
+    <div class="side-note">اختر طلبك وحدد مكان التوصيل ثم اضغط إرسال الطلب.</div>
+</aside>
+
 <aside class="mobile-menu" id="mobileMenu"><button class="close-menu" id="closeMenu">×</button><h2>☕ كافيه فرفشة</h2><a href="/">🏠 المنيو</a><a href="/login">📋 لوحة المدير</a><a href="{{ qr_url }}" target="_blank">▦ QR</a><a href="#cartBox" onclick="toggleCart();closeMenu();">🛒 السلة</a></aside>
 <header class="header"><button class="icon-btn" id="menuBtn">☰</button><h1>كافيه فرفشة ☕</h1><button class="icon-btn" onclick="toggleCart()">🛒<span class="count" id="cartCount">0</span></button></header>
 <main class="wrap">
@@ -563,7 +657,7 @@ HOME_HTML = r'''
 <nav class="tabs"><button class="tab active" onclick="filterCategory('all',this)">الكل</button><button class="tab" onclick="filterCategory('مشروبات ساخنة',this)">☕ ساخنة</button><button class="tab" onclick="filterCategory('مشروبات باردة',this)">🥤 باردة</button><button class="tab" onclick="filterCategory('شيشة',this)">💨 شيشة</button><button class="tab" onclick="filterCategory('حلويات',this)">🍰 حلويات</button><button class="tab" onclick="filterCategory('وجبات خفيفة',this)">🥪 خفيفة</button></nav>
 <section class="products">{% for item in menu %}<article class="product product-card" data-category="{{ item.category }}"><div class="photo"><img src="{{ item.image }}"></div><div class="info"><h3>{{ item.name }}</h3><p class="desc">{{ item.description }}</p><div class="bottom"><div class="price">{{ item.price }} جنيه</div><div class="qty"><button onclick="changeQty({{ item.id }},-1)">-</button><b id="qty-{{ item.id }}">0</b><button onclick="changeQty({{ item.id }},1)">+</button><button class="add" onclick="addToCart({{ item.id }})">🛒</button></div></div></div></article>{% endfor %}</section>
 </main>
-<section class="drawer" id="cartBox"><div class="summary"><div><b>الإجمالي</b><br><span id="totalPrice">0</span> جنيه</div><div><button class="view" onclick="toggleCart()">عرض & اخفاء السلة</button><button class="send" onclick="sendOrder()">إرسال</button></div></div><div class="cart-list" id="cartList"><div class="form-box"><label>اسم صاحب الطلب</label><input id="customerName" placeholder="مثال: أحمد محمد"></div><div class="form-box"><label>نوع المكان</label><select id="placeType" onchange="updatePlaceOptions()"><option value="">اختر نوع المكان</option><option value="admin">النيابة الإدارية</option><option value="cafe">الكافيه</option></select></div><div class="form-box"><label>مكان الطلب</label><select id="orderPlace"><option value="">اختر نوع المكان أولاً</option></select></div><div id="cartItems"></div><button class="view" style="width:100%" onclick="clearCart()">مسح الطلب</button></div></section>
+<section class="drawer" id="cartBox"><div class="summary"><div><b>الإجمالي</b><br><span id="totalPrice">0</span> جنيه</div><div><button class="view" onclick="toggleCart()">عرض</button><button class="send" onclick="sendOrder()">إرسال</button></div></div><div class="cart-list" id="cartList"><div class="form-box"><label>اسم صاحب الطلب</label><input id="customerName" placeholder="مثال: أحمد محمد"></div><div class="form-box"><label>نوع المكان</label><select id="placeType" onchange="updatePlaceOptions()"><option value="">اختر نوع المكان</option><option value="admin">النيابة الإدارية</option><option value="cafe">الكافيه</option></select></div><div class="form-box"><label>مكان الطلب</label><select id="orderPlace"><option value="">اختر نوع المكان أولاً</option></select></div><div id="cartItems"></div><button class="view" style="width:100%" onclick="clearCart()">مسح الطلب</button></div></section>
 <script>
 const menu={{ menu|tojson }};let quantities={};let cart=[];
 function toast(m){let t=document.getElementById('toast');t.innerText=m;t.style.display='block';setTimeout(()=>t.style.display='none',1800)}
