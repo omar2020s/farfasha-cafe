@@ -120,21 +120,13 @@ def home():
 def send_order():
     data = request.get_json() or {}
     customer_name = (data.get("customer_name") or "").strip()
-    admin_floor = (data.get("admin_floor") or "").strip()
-    cafe_table = (data.get("cafe_table") or "").strip()
+    order_place = (data.get("order_place") or "").strip()
     cart = data.get("cart", [])
-
-    selected_places = []
-    if admin_floor:
-        selected_places.append(admin_floor)
-    if cafe_table:
-        selected_places.append(cafe_table)
-    order_place = " / ".join(selected_places)
 
     if not customer_name:
         return jsonify({"success": False, "message": "من فضلك اكتب اسم صاحب الطلب"})
     if not order_place:
-        return jsonify({"success": False, "message": "من فضلك اختر مكان الطلب من إحدى القائمتين"})
+        return jsonify({"success": False, "message": "من فضلك اختر مكان الطلب"})
     if not cart:
         return jsonify({"success": False, "message": "السلة فارغة"})
 
@@ -316,7 +308,7 @@ HOME_HTML = r'''
 <div class="section-title">المشروبات والأصناف ☕</div>
 <section class="products">{% for item in menu %}<article class="product product-card" data-category="{{ item.category }}"><div class="photo"><img src="{{ item.image }}" alt="{{ item.name }}"><span class="heart">♡</span></div><div class="info"><div><h3>{{ item.name }}</h3><p class="desc">{{ item.desc }}</p></div><div class="bottom"><div class="price">{{ item.price }} جنيه</div><div class="qty"><button onclick="changeQty({{ item.id }},-1)">-</button><b id="qty-{{ item.id }}">0</b><button onclick="changeQty({{ item.id }},1)">+</button><button class="add" onclick="addToCart({{ item.id }})">🛒</button></div></div></div></article>{% endfor %}</section>
 </main>
-<section class="cart-drawer" id="cartBox"><div class="cart-summary"><div class="bag">🛍️</div><div class="cart-total"><b>الإجمالي</b><br><span id="totalPrice">0</span> جنيه</div><div class="cart-actions"><button class="view-cart" onclick="toggleCart()">عرض السلة</button><button class="send-order" onclick="sendOrder()">إرسال</button></div></div><div class="cart-list" id="cartList"><div class="order-fields"><div><label for="customerName">اسم صاحب الطلب</label><input id="customerName" type="text" placeholder="مثال: أحمد محمد" autocomplete="name"></div><div><label for="adminFloor">النيابة الإدارية</label><select id="adminFloor"><option value="">اختار دور النيابة الإدارية</option>{% for floor in order_floors %}<option value="{{ floor }}">{{ floor }}</option>{% endfor %}</select></div><div><label for="cafeTable">الكافيه</label><select id="cafeTable"><option value="">اختار طاولة الكافيه</option>{% for table in cafe_tables %}<option value="{{ table }}">{{ table }}</option>{% endfor %}</select></div></div><div id="cartItems"></div><button class="clear" onclick="clearCart()">مسح الطلب 🗑️</button></div></section>
+<section class="cart-drawer" id="cartBox"><div class="cart-summary"><div class="bag">🛍️</div><div class="cart-total"><b>الإجمالي</b><br><span id="totalPrice">0</span> جنيه</div><div class="cart-actions"><button class="view-cart" onclick="toggleCart()">عرض السلة</button><button class="send-order" onclick="sendOrder()">إرسال</button></div></div><div class="cart-list" id="cartList"><div class="order-fields"><div><label for="customerName">اسم صاحب الطلب</label><input id="customerName" type="text" placeholder="مثال: أحمد محمد" autocomplete="name"></div><div><label for="placeType">اختار نوع المكان</label><select id="placeType" onchange="updatePlaceOptions()"><option value="">اختر نوع المكان</option><option value="admin">النيابة الإدارية</option><option value="cafe">الكافيه</option></select></div><div><label for="orderPlace">مكان الطلب</label><select id="orderPlace"><option value="">اختر نوع المكان أولًا</option></select></div></div><div id="cartItems"></div><button class="clear" onclick="clearCart()">مسح الطلب 🗑️</button></div></section>
 <script>
 const menu={{ menu|tojson }}; let quantities={}; let cart=[];
 function showToast(msg){let t=document.getElementById('toast');t.innerText=msg;t.style.display='block';setTimeout(()=>t.style.display='none',2000)}
@@ -329,14 +321,34 @@ function changeQty(id,change){quantities[id]=(quantities[id]||0)+change;if(quant
 function addToCart(id){let qty=quantities[id]||0;if(qty<=0){showToast('اختار الكمية أولاً');return;}let item=menu.find(x=>x.id===id);let exists=cart.find(x=>x.id===id);if(exists){exists.qty+=qty}else{cart.push({id:item.id,name:item.name,price:item.price,qty:qty})}quantities[id]=0;document.getElementById('qty-'+id).innerText=0;renderCart();showToast('تمت الإضافة إلى السلة')}
 function renderCart(){let box=document.getElementById('cartItems');let total=0;let count=0;box.innerHTML='';if(cart.length===0)box.innerHTML='<div class="empty">لا يوجد طلبات حالياً</div>';cart.forEach((item,index)=>{total+=item.price*item.qty;count+=item.qty;box.innerHTML+=`<div class="cart-item"><div>${item.name}</div><b>${item.qty}</b><div>${item.price*item.qty} جنيه</div><button class="remove" onclick="removeItem(${index})">×</button></div>`});document.getElementById('totalPrice').innerText=total;document.getElementById('cartCount').innerText=count;}
 function removeItem(index){cart.splice(index,1);renderCart()} function clearCart(){cart=[];renderCart()}
+function updatePlaceOptions(){
+    const placeType=document.getElementById('placeType').value;
+    const orderPlace=document.getElementById('orderPlace');
+    orderPlace.innerHTML='';
+    if(placeType==='admin'){
+        const floors=[
+            'النيابة الإدارية - الدور الأرضي',
+            'النيابة الإدارية - الأول علوي',
+            'النيابة الإدارية - الثاني علوي',
+            'النيابة الإدارية - الثالث علوي',
+            'النيابة الإدارية - الرابع علوي'
+        ];
+        orderPlace.innerHTML='<option value="">اختر الدور</option>';
+        floors.forEach(place=>{orderPlace.innerHTML+=`<option value="${place}">${place}</option>`});
+    }else if(placeType==='cafe'){
+        orderPlace.innerHTML='<option value="">اختر الطاولة</option>';
+        for(let i=1;i<=20;i++){orderPlace.innerHTML+=`<option value="الكافيه - طاولة رقم ${i}">الكافيه - طاولة رقم ${i}</option>`}
+    }else{
+        orderPlace.innerHTML='<option value="">اختر نوع المكان أولًا</option>';
+    }
+}
 function sendOrder(){
     if(cart.length===0){showToast('السلة فارغة');return;}
     const customerName=document.getElementById('customerName').value.trim();
-    const adminFloor=document.getElementById('adminFloor').value;
-    const cafeTable=document.getElementById('cafeTable').value;
+    const orderPlace=document.getElementById('orderPlace').value;
     if(!customerName){document.getElementById('cartList').classList.add('open');document.getElementById('customerName').focus();showToast('من فضلك اكتب اسم صاحب الطلب');return;}
-    if(!adminFloor && !cafeTable){document.getElementById('cartList').classList.add('open');showToast('من فضلك اختر مكان الطلب');return;}
-    fetch('/send-order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer_name:customerName,admin_floor:adminFloor,cafe_table:cafeTable,cart:cart})}).then(r=>r.json()).then(data=>{showToast(data.message);if(data.success){alert('✅ تم إرسال الطلب بنجاح');clearCart();document.getElementById('customerName').value='';document.getElementById('adminFloor').value='';document.getElementById('cafeTable').value='';document.getElementById('cartList').classList.remove('open')}})
+    if(!orderPlace){document.getElementById('cartList').classList.add('open');showToast('من فضلك اختر مكان الطلب');return;}
+    fetch('/send-order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer_name:customerName,order_place:orderPlace,cart:cart})}).then(r=>r.json()).then(data=>{showToast(data.message);if(data.success){alert('✅ تم إرسال الطلب بنجاح');clearCart();document.getElementById('customerName').value='';document.getElementById('placeType').value='';updatePlaceOptions();document.getElementById('cartList').classList.remove('open')}})
 }
 renderCart();
 </script>
