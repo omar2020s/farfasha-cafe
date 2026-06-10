@@ -273,13 +273,13 @@ HOME_HTML = r'''
     <p>نكهة كل لحظة</p>
     <a href="/">🏠 المنيو</a>
     <a href="/login">📋 لوحة المدير</a>
-    <a href="{{ qr_url }}" target="_blank">▦ QR للطاولة</a>
+    <a href="{{ qr_url }}" target="_blank">▦ QR صاحب الطلب</a>
     <a href="#cartBox" id="cartMenuLink">🛒 السلة</a>
 </aside>
-<aside class="desktop-sidebar"><h2>كافيه فرفشة ☕</h2><p>نكهة كل لحظة</p><a class="active" href="/">🏠 المنيو</a><a href="/login">📋 لوحة المدير</a><a href="{{ qr_url }}" target="_blank">▦ QR للطاولة</a></aside>
+<aside class="desktop-sidebar"><h2>كافيه فرفشة ☕</h2><p>نكهة كل لحظة</p><a class="active" href="/">🏠 المنيو</a><a href="/login">📋 لوحة المدير</a><a href="{{ qr_url }}" target="_blank">▦ QR صاحب الطلب</a></aside>
 <header class="mobile-header"><button type="button" id="mobileMenuBtn" class="icon-btn">☰</button><h1>كافيه فرفشة ☕</h1><button class="icon-btn" onclick="toggleCart()">🛒<span class="cart-count" id="cartCount">0</span></button></header>
 <main class="wrap">
-<section class="hero"><div><small>مرحباً بك في</small><h2>كافيه فرفشة 👋</h2><p>لذيذ يبدأ من هنا ✨</p><div class="table-chip">رقم الطاولة <b>{{ table_number }}</b></div></div></section>
+<section class="hero"><div><small>مرحباً بك في</small><h2>كافيه فرفشة 👋</h2><p>لذيذ يبدأ من هنا ✨</p><div class="table-chip">صاحب الطلب <b>{{ table_number }}</b></div></div></section>
 <section class="links-card"><div><div><b>رابط المنيو</b><br><span>شارك المنيو مع أصدقائك</span></div><div class="round-icon">🔗</div></div><div><div><b>رابط الباركود</b><br><span>امسح لفتح المنيو</span></div><div class="round-icon">▦</div></div></section>
 <nav class="tabs"><button class="tab active" onclick="filterCategory('all',this)">▦<span>كل الأصناف</span></button><button class="tab" onclick="filterCategory('hot',this)">☕<span>المشروبات الساخنة</span></button><button class="tab" onclick="filterCategory('cold',this)">🥤<span>المشروبات الباردة</span></button><button class="tab" onclick="filterCategory('juice',this)">🍊<span>العصائر</span></button><button class="tab" onclick="filterCategory('dessert',this)">🍰<span>الحلويات</span></button><button class="tab" onclick="filterCategory('sandwich',this)">🥪<span>السندوتشات</span></button></nav>
 <div class="section-title">المشروبات والأصناف ☕</div>
