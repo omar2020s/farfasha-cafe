@@ -16,6 +16,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "farfasha_secret_key_change_this_2
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_URL = os.environ.get("DATABASE_URL")
 ADMIN_PIN = os.environ.get("ADMIN_PIN", "837291")
+DEFAULT_IMAGE = "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=900"
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID_ENV = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 
