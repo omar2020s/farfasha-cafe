@@ -63,6 +63,30 @@ def add_column_if_missing(cur, table, column, definition):
         cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
+def fix_orders_schema(cur):
+    """
+    يعالج قواعد البيانات القديمة التي كان فيها table_number نوعه INTEGER.
+    الخطأ عند إرسال طلب للنيابة كان بسبب حفظ نص مثل: النيابة الإدارية - الأول علوي
+    داخل عمود integer. هنا نحول العمود إلى TEXT بشكل آمن.
+    """
+    cur.execute(
+        """
+        SELECT data_type
+        FROM information_schema.columns
+        WHERE table_name = %s AND column_name = %s
+        LIMIT 1
+        """,
+        ("orders", "table_number"),
+    )
+    row = cur.fetchone()
+    if row and row.get("data_type") != "text":
+        cur.execute("ALTER TABLE orders ALTER COLUMN table_number TYPE TEXT USING table_number::TEXT")
+    try:
+        cur.execute("ALTER TABLE orders ALTER COLUMN table_number DROP NOT NULL")
+    except Exception:
+        pass
+
+
 def log_action(action, user_name="مدير"):
     try:
         conn = get_db()
@@ -96,6 +120,7 @@ def init_db():
     add_column_if_missing(cur, "orders", "customer_name", "TEXT DEFAULT 'عميل'")
     add_column_if_missing(cur, "orders", "order_place", "TEXT DEFAULT ''")
     add_column_if_missing(cur, "orders", "table_number", "TEXT DEFAULT ''")
+    fix_orders_schema(cur)
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS order_items (
