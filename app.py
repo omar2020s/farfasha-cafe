@@ -5,9 +5,9 @@ from datetime import datetime
 import os
 import io
 import qrcode
-import urllib.parse
+import json
 import urllib.request
-import base64
+import urllib.parse
 from functools import wraps
 
 app = Flask(__name__)
@@ -16,6 +16,8 @@ app.secret_key = os.environ.get("SECRET_KEY", "farfasha_secret_key_change_this_2
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_URL = os.environ.get("DATABASE_URL")
 ADMIN_PIN = os.environ.get("ADMIN_PIN", "837291")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_CHAT_ID_ENV = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 
 DEFAULT_MENU = [
     (1, "قهوة تركي", "قهوة تركية أصلية بطعم غني ورائحة مميزة", 15, "مشروبات ساخنة", "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd%sw=900", 1),
@@ -207,77 +209,6 @@ def init_db():
 init_db()
 
 
-
-def get_settings_dict():
-    """قراءة إعدادات النظام من PostgreSQL كقاموس."""
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT key, value FROM settings")
-    settings = {r["key"]: r["value"] for r in cur.fetchall()}
-    cur.close()
-    conn.close()
-    return settings
-
-
-def build_order_sms(order_id, customer_name, order_place, clean_items, total):
-    """تكوين نص رسالة الطلب بشكل مختصر مناسب للـ SMS."""
-    lines = [
-        f"طلب جديد من كافيه فرفشة #{order_id}",
-        f"العميل: {customer_name}",
-        f"المكان: {order_place}",
-        "الأصناف:",
-    ]
-    for item in clean_items:
-        line_total = float(item["price"]) * int(item["qty"])
-        lines.append(f"- {item['name']} × {item['qty']} = {line_total:g} جنيه")
-    lines.append(f"الإجمالي: {float(total):g} جنيه")
-    lines.append(f"الوقت: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    return "\n".join(lines)
-
-
-def send_sms_notification(to_phone, message):
-    """
-    إرسال SMS عبر Twilio بدون مكتبات إضافية.
-    يجب إضافة هذه Environment Variables في Render:
-    TWILIO_ACCOUNT_SID
-    TWILIO_AUTH_TOKEN
-    TWILIO_FROM_NUMBER
-
-    رقم المستقبل يجب أن يكون بصيغة دولية مثل:
-    +201xxxxxxxxx أو +9665xxxxxxxx
-    """
-    account_sid = os.environ.get("TWILIO_ACCOUNT_SID", "").strip()
-    auth_token = os.environ.get("TWILIO_AUTH_TOKEN", "").strip()
-    from_number = os.environ.get("TWILIO_FROM_NUMBER", "").strip()
-
-    if not to_phone:
-        return False, "رقم استقبال الرسائل غير موجود في الإعدادات"
-    if not (account_sid and auth_token and from_number):
-        return False, "بيانات Twilio غير مكتملة في Render Environment Variables"
-
-    api_url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
-    form_data = urllib.parse.urlencode({
-        "To": to_phone,
-        "From": from_number,
-        "Body": message,
-    }).encode("utf-8")
-
-    auth_bytes = f"{account_sid}:{auth_token}".encode("utf-8")
-    auth_header = "Basic " + base64.b64encode(auth_bytes).decode("utf-8")
-
-    req = urllib.request.Request(api_url, data=form_data, method="POST")
-    req.add_header("Authorization", auth_header)
-    req.add_header("Content-Type", "application/x-www-form-urlencoded")
-
-    try:
-        with urllib.request.urlopen(req, timeout=15) as response:
-            if 200 <= response.status < 300:
-                return True, "تم إرسال الرسالة النصية بنجاح"
-            return False, f"فشل إرسال الرسالة. HTTP {response.status}"
-    except Exception as e:
-        return False, str(e)
-
-
 def get_menu_items(active_only=False):
     conn = get_db()
     cur = conn.cursor()
@@ -308,6 +239,74 @@ def admin_required(func):
     return wrapper
 
 
+
+
+def get_setting_value(key, default=""):
+    """قراءة قيمة من جدول settings بدون تعطيل البرنامج عند حدوث خطأ."""
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT value FROM settings WHERE key = %s", (key,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        return (row["value"] if row and row.get("value") is not None else default) or default
+    except Exception:
+        return default
+
+
+def get_telegram_chat_id():
+    """الأولوية للرقم الموجود في Render، ثم الرقم المحفوظ من لوحة المدير."""
+    return TELEGRAM_CHAT_ID_ENV or get_setting_value("telegram_chat_id", "")
+
+
+def send_telegram_message(message):
+    """إرسال رسالة Telegram بدون تعطيل إرسال الطلب إذا فشل الإشعار."""
+    token = TELEGRAM_BOT_TOKEN
+    chat_id = get_telegram_chat_id()
+
+    if not token:
+        return {"success": False, "message": "TELEGRAM_BOT_TOKEN غير موجود في Render Environment"}
+    if not chat_id:
+        return {"success": False, "message": "TELEGRAM_CHAT_ID غير موجود في Render أو إعدادات المدير"}
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+    }
+    try:
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=12) as response:
+            body = response.read().decode("utf-8", errors="ignore")
+            return {"success": True, "status": response.status, "response": body}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+
+def format_order_message(order_id, customer_name, order_place, clean_items, total):
+    lines = [
+        "🔔 <b>طلب جديد - كافيه فرفشة</b>",
+        f"🧾 رقم الطلب: <b>#{order_id}</b>",
+        f"👤 العميل: <b>{customer_name}</b>",
+        f"📍 المكان: <b>{order_place}</b>",
+        "",
+        "☕ <b>تفاصيل الطلب:</b>",
+    ]
+    for item in clean_items:
+        line_total = float(item["price"]) * int(item["qty"])
+        lines.append(f"• {item['name']} × {item['qty']} = {line_total:g} جنيه")
+    lines += ["", f"💰 الإجمالي: <b>{float(total):g} جنيه</b>", f"🕒 الوقت: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"]
+    return "\n".join(lines)
+
 @app.route("/")
 def home():
     menu_items = get_menu_items(active_only=True)
@@ -316,7 +315,8 @@ def home():
         HOME_HTML,
         menu=menu_items,
         qr_url=f"{base_url}/qr",
-        menu_url=f"{base_url}/"
+        menu_url=f"{base_url}/",
+        default_image=DEFAULT_IMAGE
     )
 
 
@@ -363,8 +363,18 @@ def send_order():
     cur.execute("INSERT INTO notifications (message, created_at) VALUES (%s, %s)", (f"طلب جديد رقم #{order_id} من {customer_name} - {order_place}", datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     cur.execute("INSERT INTO activity_log (user_name, action, created_at) VALUES (%s, %s, %s)", (customer_name, f"إضافة طلب رقم #{order_id}", datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     conn.commit()
+    cur.close()
     conn.close()
-    return jsonify({"success": True, "message": "تم إرسال الطلب بنجاح ✅", "order_id": order_id, "total": total})
+
+    telegram_result = send_telegram_message(
+        format_order_message(order_id, customer_name, order_place, clean_items, total)
+    )
+    if telegram_result.get("success"):
+        log_action(f"تم إرسال إشعار Telegram للطلب #{order_id}")
+    else:
+        log_action(f"فشل إشعار Telegram للطلب #{order_id}: {telegram_result.get('message', telegram_result)}")
+
+    return jsonify({"success": True, "message": "تم إرسال الطلب بنجاح ✅", "order_id": order_id, "total": total, "telegram": telegram_result})
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -617,34 +627,30 @@ def employees_add():
 def settings_save():
     conn = get_db()
     cur = conn.cursor()
-    keys = ["cafe_name", "phone", "logo", "printer", "qr_note", "sms_phone"]
-    for key in keys:
-        cur.execute(
-            "INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
-            (key, request.form.get(key, ""))
-        )
-
-    sms_enabled = "1" if request.form.get("sms_enabled") == "1" else "0"
-    cur.execute(
-        "INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
-        ("sms_enabled", sms_enabled)
-    )
+    for key in ["cafe_name", "phone", "logo", "printer", "qr_note", "telegram_chat_id"]:
+        cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", (key, request.form.get(key, "")))
     conn.commit()
     conn.close()
     return redirect(url_for("admin") + "#settings")
 
 
 
+
+@app.route("/test-telegram")
+@admin_required
+def test_telegram():
+    result = send_telegram_message("✅ اختبار Telegram من كافيه فرفشة: الإشعارات تعمل بنجاح")
+    log_action(f"اختبار Telegram: {result}")
+    return jsonify(result)
+
+
 @app.route("/test-sms")
 @admin_required
-def test_sms():
-    settings = get_settings_dict()
-    sms_phone = (settings.get("sms_phone") or "").strip()
-    message = f"رسالة تجربة من كافيه فرفشة - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-    sent, result = send_sms_notification(sms_phone, message)
-    log_action(f"تجربة SMS: {result}", "مدير")
-    return redirect(url_for("admin") + "#settings")
-
+def test_sms_legacy():
+    """رابط قديم للاختبار، أصبح يختبر Telegram بدلاً من SMS."""
+    result = send_telegram_message("✅ اختبار Telegram من كافيه فرفشة: الإشعارات تعمل بنجاح")
+    log_action(f"اختبار Telegram من رابط test-sms: {result}")
+    return jsonify(result)
 
 @app.route("/export.csv")
 @admin_required
@@ -820,7 +826,7 @@ ADMIN_HTML = r'''
 <section id="reports" class="section"><div class="panel"><h3>التقارير</h3><div class="grid3"><div class="mini-card">مبيعات اليوم: <b>{{ sales_today }}</b></div><div class="mini-card">مبيعات الشهر: <b>{{ sales_month }}</b></div><div class="mini-card">الأرباح: <b>{{ sales_today }}</b></div></div><h4>أكثر المنتجات مبيعاً</h4>{% for i in top_items %}<div class="mini-card">{{ i.item_name }} - {{ i.qty }}</div>{% endfor %}<h4>أقل المنتجات مبيعاً</h4>{% for i in low_items %}<div class="mini-card">{{ i.item_name }} - {{ i.qty }}</div>{% endfor %}<br><a class="btn btn-green" href="/export.csv">تصدير Excel CSV</a> <button class="btn-brown" onclick="window.print()">تصدير PDF / طباعة</button></div></section>
 <section id="employees" class="section"><div class="panel"><h3>إدارة الموظفين</h3><form method="post" action="/employees/add" class="grid3"><input name="name" placeholder="اسم الموظف"><select name="role"><option>مدير</option><option>كاشير</option><option>عامل كافيه</option></select><button class="btn-brown">إضافة موظف</button></form>{% for e in employees %}<div class="mini-card">{{ e.name }} - {{ e.role }} - {{ 'نشط' if e.active else 'متوقف' }}</div>{% endfor %}</div></section>
 <section id="notifications" class="section"><div class="panel"><h3>الإشعارات</h3>{% for n in notifications %}<div class="mini-card">🔔 {{ n.message }}<br><span class="muted">{{ n.created_at }}</span></div>{% endfor %}</div></section>
-<section id="settings" class="section"><div class="panel"><h3>الإعدادات</h3><form method="post" action="/settings/save" class="grid2"><input name="cafe_name" value="{{ settings.cafe_name }}" placeholder="اسم الكافيه"><input name="phone" value="{{ settings.phone }}" placeholder="رقم الهاتف"><input name="logo" value="{{ settings.logo }}" placeholder="الشعار"><input name="printer" value="{{ settings.printer }}" placeholder="إعدادات الطباعة"><input name="qr_note" value="{{ settings.qr_note }}" placeholder="إعدادات QR"><input name="sms_phone" value="{{ settings.sms_phone if settings.sms_phone is defined else '' }}" placeholder="رقم استقبال SMS مثال: +201000000000"><label class="mini-card" style="display:flex;align-items:center;gap:10px;font-weight:900"><input type="checkbox" name="sms_enabled" value="1" style="width:auto" {% if settings.sms_enabled == '1' %}checked{% endif %}> تفعيل إرسال تفاصيل الطلب SMS</label><button class="btn-brown">حفظ الإعدادات</button></form><br><a class="btn btn-blue" href="/test-sms">إرسال رسالة تجربة SMS</a><p class="muted">لتشغيل الرسائل فعليًا أضف في Render: TWILIO_ACCOUNT_SID و TWILIO_AUTH_TOKEN و TWILIO_FROM_NUMBER. رقم الاستقبال يجب أن يكون دوليًا مثل +201xxxxxxxxx أو +9665xxxxxxxx.</p><p>كلمة مرور المدير الحالية من متغير ADMIN_PIN أو داخل الكود.</p></div></section>
+<section id="settings" class="section"><div class="panel"><h3>الإعدادات</h3><form method="post" action="/settings/save" class="grid2"><input name="cafe_name" value="{{ settings.cafe_name }}" placeholder="اسم الكافيه"><input name="phone" value="{{ settings.phone }}" placeholder="رقم الهاتف"><input name="logo" value="{{ settings.logo }}" placeholder="الشعار"><input name="printer" value="{{ settings.printer }}" placeholder="إعدادات الطباعة"><input name="qr_note" value="{{ settings.qr_note }}" placeholder="إعدادات QR"><input name="telegram_chat_id" value="{{ settings.telegram_chat_id }}" placeholder="Telegram Chat ID لاستقبال الطلبات"><button class="btn-brown">حفظ الإعدادات</button></form><p>اختبار Telegram: <a class="btn btn-blue" href="/test-telegram" target="_blank">إرسال رسالة اختبار</a></p><p>كلمة مرور المدير الحالية من متغير ADMIN_PIN أو داخل الكود.</p></div></section>
 <section id="logs" class="section"><div class="panel"><h3>سجل العمليات</h3>{% for l in activity_log %}<div class="mini-card">{{ l.user_name }} - {{ l.action }}<br><span class="muted">{{ l.created_at }}</span></div>{% endfor %}</div></section>
 </main></div><script>
 function showSection(id,el){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.nav a').forEach(a=>a.classList.remove('active'));if(el)el.classList.add('active')}
