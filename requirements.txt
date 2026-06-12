@@ -1,5 +1,6 @@
 flask
-qrcode
-pillow
 gunicorn
 psycopg2-binary
+qrcode
+pillow
+twilio
