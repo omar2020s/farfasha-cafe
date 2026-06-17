@@ -22,7 +22,7 @@ TELEGRAM_CHAT_ID_ENV = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 
 DEFAULT_MENU = [
     (1, "قهوة تركي", "قهوة تركية أصلية بطعم غني ورائحة مميزة", 15, "مشروبات ساخنة", "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd%sw=900", 1),
-    (2, "شاي", "شاي أحمر نقي ومنعش", 10, "مشروبات ساخنة", "https://images.unsplash.com/photo-1576092768241-dec231879fc3%sw=900", 1),
+    (2, "شاي", "شاي أحمر نقي ومنعش", 15, "مشروبات ساخنة", "https://images.unsplash.com/photo-1576092768241-dec231879fc3%sw=900", 1),
     (3, "كابتشينو", "اسبريسو مع حليب مبخر ورغوة ناعمة", 25, "مشروبات ساخنة", "https://images.unsplash.com/photo-1534778101976-62847782c213%sw=900", 1),
     (4, "موكا", "مزيج رائع من القهوة والشوكولاتة", 30, "مشروبات ساخنة", "https://images.unsplash.com/photo-1572442388796-11668a67e53d%sw=900", 1),
     (5, "قهوة مثلجة", "قهوة باردة ومنعشة", 25, "مشروبات باردة", "https://images.unsplash.com/photo-1461023058943-07fcbe16d735%sw=900", 1),
