@@ -31,7 +31,7 @@ DEFAULT_MENU = [
 ]
 
 ORDER_STATUSES = ["جديد", "قيد التحضير", "جاهز", "تم التسليم", "ملغي"]
-CATEGORIES = ["مشروبات ساخنة", "مشروبات باردة", "شيشة", "حلويات", "وجبات خفيفة"]
+CATEGORIES = ["مشروبات ساخنة", "مشروبات باردة", "شيشة", "حلويات", "وجبات خفيفة" , "شاى"]
 DEFAULT_IMAGE = "https://images.pexels.com/photos/302899/pexels-photo-302899.jpeg?auto=compress&cs=tinysrgb&w=900"
 
 
