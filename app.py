@@ -149,6 +149,10 @@ def init_db():
             created_at TEXT DEFAULT ''
         )
     """)
+    # إصلاح قواعد البيانات القديمة: لو جدول categories موجود سابقًا بدون الأعمدة الجديدة
+    add_column_if_missing(cur, "categories", "emoji", "TEXT DEFAULT '🍽️'")
+    add_column_if_missing(cur, "categories", "active", "INTEGER DEFAULT 1")
+    add_column_if_missing(cur, "categories", "created_at", "TEXT DEFAULT ''")
 
     for category_name, emoji in DEFAULT_CATEGORIES:
         cur.execute(
