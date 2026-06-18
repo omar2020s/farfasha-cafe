@@ -1050,7 +1050,18 @@ document.addEventListener('DOMContentLoaded',()=>{document.getElementById('menuB
 function setCartOpen(isOpen){const list=document.getElementById('cartList');if(isOpen){list.classList.add('open')}else{list.classList.remove('open')}}
 function toggleCart(){document.getElementById('cartList').classList.toggle('open')}
 function updatePlaceOptions(){let type=document.getElementById('placeType').value;let p=document.getElementById('orderPlace');p.innerHTML='';if(type==='admin'){['الدور الأرضي','الأول علوي','الثاني علوي','الثالث علوي','الرابع علوي'].forEach(f=>p.innerHTML+=`<option value="النيابة الإدارية - ${f}">النيابة الإدارية - ${f}</option>`)}else if(type==='cafe'){for(let i=1;i<=20;i++){p.innerHTML+=`<option value="الكافيه - طاولة رقم ${i}">الكافيه - طاولة رقم ${i}</option>`}}else{p.innerHTML='<option value="">اختر نوع المكان أولاً</option>'}}
-function filterCategory(c,b){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.querySelectorAll('.product-card').forEach(card=>card.style.display=(c==='all'||card.dataset.category===c)?'grid':'none')}
+function filterCategory(c,b){
+    const searchInput=document.getElementById('productSearchInput');
+    const searchResults=document.getElementById('productSearchResults');
+    if(searchInput){searchInput.value='';}
+    if(searchResults){searchResults.classList.remove('show');searchResults.innerHTML='';}
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    if(b){b.classList.add('active');}
+    document.querySelectorAll('.product-card').forEach(card=>{
+        card.classList.remove('hide-by-search');
+        card.style.display=(c==='all'||card.dataset.category===c)?'grid':'none';
+    });
+}
 function changeQty(id,d){quantities[id]=(quantities[id]||0)+d;if(quantities[id]<0)quantities[id]=0;document.getElementById('qty-'+id).innerText=quantities[id]}
 function addToCart(id){let q=quantities[id]||0;if(q<=0){toast('اختار الكمية أولاً');return}let item=menu.find(x=>x.id===id);let ex=cart.find(x=>x.id===id);if(ex){ex.qty+=q}else{cart.push({id:item.id,name:item.name,price:item.price,qty:q})}quantities[id]=0;document.getElementById('qty-'+id).innerText=0;renderCart();toast('تمت الإضافة')}
 function renderCart(){let box=document.getElementById('cartItems');let total=0,count=0;box.innerHTML='';if(cart.length===0)box.innerHTML='<p>لا يوجد طلبات حالياً</p>';cart.forEach((it,i)=>{total+=it.price*it.qty;count+=it.qty;box.innerHTML+=`<div class="cart-item"><div>${it.name}</div><b>${it.qty}</b><div>${it.price*it.qty}</div><button class="remove" onclick="removeItem(${i})">×</button></div>`});document.getElementById('totalPrice').innerText=total;document.getElementById('cartCount').innerText=count}
