@@ -979,6 +979,19 @@ HOME_HTML = r'''
 .search-row button{border:0;border-radius:14px;padding:12px 14px;background:linear-gradient(135deg,#6f3516,#3f1c0a);color:#fff;font-family:inherit;font-weight:900}
 .order-result{display:none;margin-top:10px;background:#fffaf6;border:1px dashed var(--line);border-radius:15px;padding:12px;line-height:1.9}
 .order-result.show{display:block}
+.product-search-box{margin:14px 0;background:#fff;border:1px solid var(--line);box-shadow:var(--shadow);border-radius:22px;padding:14px}
+.product-search-box h3{margin:0 0 10px;color:var(--brown);font-size:18px}
+.product-search-row{display:flex;gap:8px}
+.product-search-row input{flex:1;border:1px solid var(--line);border-radius:14px;padding:12px;font-family:inherit;background:#fffaf6}
+.product-search-row button{border:0;border-radius:14px;padding:12px 14px;background:linear-gradient(135deg,#6f3516,#3f1c0a);color:#fff;font-family:inherit;font-weight:900}
+.product-search-results{display:none;margin-top:10px;background:#fffaf6;border:1px dashed var(--line);border-radius:15px;padding:10px;line-height:1.8;max-height:260px;overflow:auto}
+.product-search-results.show{display:block}
+.product-result-item{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;border-bottom:1px dashed #eaded5;padding:9px 0}
+.product-result-item:last-child{border-bottom:0}
+.product-result-item b{color:var(--brown)}
+.product-result-item small{color:var(--muted)}
+.product-result-item button{border:0;border-radius:12px;padding:9px 11px;background:#5b2b12;color:#fff;font-family:inherit;font-weight:900}
+.product-card.hide-by-search{display:none !important}
 .cart-list{display:none !important;}
 .cart-list.open{display:block !important;}
 .view{white-space:nowrap}
@@ -996,11 +1009,11 @@ HOME_HTML = r'''
     <a class="active" href="/">🏠 المنيو</a>
     <a href="/login">📋 لوحة المدير</a>
     <a href="{{ qr_url }}" target="_blank">▦ QR للطاولة</a>
-    <a href="#orderSearchBox">🔎 بحث عن طلب</a><a href="#cartBox" onclick="setCartOpen(true)">🛒 السلة</a>
+    <a href="#orderSearchBox">🔎 بحث عن طلب</a><a href="#productSearchBox">🔍 بحث عن صنف</a><a href="#cartBox" onclick="setCartOpen(true)">🛒 السلة</a>
     <div class="side-note">اختر طلبك وحدد مكان التوصيل ثم اضغط إرسال الطلب.</div>
 </aside>
 
-<aside class="mobile-menu" id="mobileMenu"><button class="close-menu" id="closeMenu">×</button><h2>☕ كافيه فرفشة</h2><a href="/">🏠 المنيو</a><a href="/login">📋 لوحة المدير</a><a href="{{ qr_url }}" target="_blank">▦ QR</a><a href="#orderSearchBox" onclick="closeMenu();">🔎 بحث عن طلب</a><a href="#cartBox" onclick="setCartOpen(true);closeMenu();">🛒 السلة</a></aside>
+<aside class="mobile-menu" id="mobileMenu"><button class="close-menu" id="closeMenu">×</button><h2>☕ كافيه فرفشة</h2><a href="/">🏠 المنيو</a><a href="/login">📋 لوحة المدير</a><a href="{{ qr_url }}" target="_blank">▦ QR</a><a href="#orderSearchBox" onclick="closeMenu();">🔎 بحث عن طلب</a><a href="#productSearchBox" onclick="closeMenu();">🔍 بحث عن صنف</a><a href="#cartBox" onclick="setCartOpen(true);closeMenu();">🛒 السلة</a></aside>
 <header class="header"><button class="icon-btn" id="menuBtn">☰</button><h1>كافيه فرفشة ☕</h1><button class="icon-btn" onclick="toggleCart()">🛒<span class="count" id="cartCount">0</span></button></header>
 <main class="wrap">
 <section class="hero"><div><small>مرحباً بك في</small><h2>كافيه فرفشة 👋</h2><p>اختار طلبك وحدد مكان التوصيل</p></div></section>
@@ -1012,13 +1025,21 @@ HOME_HTML = r'''
 </div>
 <div class="order-result" id="clientOrderResult"></div>
 </section>
+<section class="product-search-box" id="productSearchBox">
+<h3>🔍 البحث عن صنف لطلبه</h3>
+<div class="product-search-row">
+<input id="productSearchInput" placeholder="اكتب اسم الصنف مثال: شاي أو قهوة" oninput="searchProductsByName()" onkeydown="if(event.key==='Enter'){event.preventDefault();addFirstSearchResult();}">
+<button onclick="addFirstSearchResult()">إضافة أول نتيجة</button>
+</div>
+<div class="product-search-results" id="productSearchResults"></div>
+</section>
 <nav class="tabs">
 <button class="tab active" onclick="filterCategory('all',this)">الكل</button>
 {% for c in categories %}
 <button class="tab" onclick="filterCategory({{ c.name|tojson }},this)">{{ c.emoji }} {{ c.name }}</button>
 {% endfor %}
 </nav>
-<section class="products">{% for item in menu %}<article class="product product-card" data-category="{{ item.category }}"><div class="photo"><img src="{{ item.image }}"></div><div class="info"><h3>{{ item.name }}</h3><p class="desc">{{ item.description }}</p><div class="bottom"><div class="price">{{ item.price }} جنيه</div><div class="qty"><button onclick="changeQty({{ item.id }},-1)">-</button><b id="qty-{{ item.id }}">0</b><button onclick="changeQty({{ item.id }},1)">+</button><button class="add" onclick="addToCart({{ item.id }})">🛒</button></div></div></div></article>{% endfor %}</section>
+<section class="products">{% for item in menu %}<article id="product-{{ item.id }}" class="product product-card" data-category="{{ item.category }}" data-name="{{ item.name }} {{ item.description }}"><div class="photo"><img src="{{ item.image or default_image }}" onerror="this.onerror=null;this.src='{{ default_image }}';"></div><div class="info"><h3>{{ item.name }}</h3><p class="desc">{{ item.description }}</p><div class="bottom"><div class="price">{{ item.price }} جنيه</div><div class="qty"><button onclick="changeQty({{ item.id }},-1)">-</button><b id="qty-{{ item.id }}">0</b><button onclick="changeQty({{ item.id }},1)">+</button><button class="add" onclick="addToCart({{ item.id }})">🛒</button></div></div></div></article>{% endfor %}</section>
 </main>
 <section class="drawer" id="cartBox"><div class="summary"><div><b>الإجمالي</b><br><span id="totalPrice">0</span> جنيه</div><div><button class="view" id="cartToggleBtn" onclick="toggleCart()">عرض & إخفاء السلة</button><button class="send" onclick="sendOrder()">إرسال الطلب</button></div></div><div class="cart-list" id="cartList"><div class="form-box"><label>اسم صاحب الطلب</label><input id="customerName" placeholder="مثال: أحمد محمد"></div><div class="form-box"><label>نوع المكان</label><select id="placeType" onchange="updatePlaceOptions()"><option value="">اختر نوع المكان</option><option value="admin">النيابة الإدارية</option><option value="cafe">الكافيه</option></select></div><div class="form-box"><label>مكان الطلب</label><select id="orderPlace"><option value="">اختر نوع المكان أولاً</option></select></div><div id="cartItems"></div><button class="view" style="width:100%" onclick="clearCart()">مسح الطلب</button></div></section>
 <script>
@@ -1034,6 +1055,43 @@ function changeQty(id,d){quantities[id]=(quantities[id]||0)+d;if(quantities[id]<
 function addToCart(id){let q=quantities[id]||0;if(q<=0){toast('اختار الكمية أولاً');return}let item=menu.find(x=>x.id===id);let ex=cart.find(x=>x.id===id);if(ex){ex.qty+=q}else{cart.push({id:item.id,name:item.name,price:item.price,qty:q})}quantities[id]=0;document.getElementById('qty-'+id).innerText=0;renderCart();toast('تمت الإضافة')}
 function renderCart(){let box=document.getElementById('cartItems');let total=0,count=0;box.innerHTML='';if(cart.length===0)box.innerHTML='<p>لا يوجد طلبات حالياً</p>';cart.forEach((it,i)=>{total+=it.price*it.qty;count+=it.qty;box.innerHTML+=`<div class="cart-item"><div>${it.name}</div><b>${it.qty}</b><div>${it.price*it.qty}</div><button class="remove" onclick="removeItem(${i})">×</button></div>`});document.getElementById('totalPrice').innerText=total;document.getElementById('cartCount').innerText=count}
 function removeItem(i){cart.splice(i,1);renderCart()}function clearCart(){cart=[];renderCart()}
+function normalizeText(v){return (v||'').toString().toLowerCase().replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').trim()}
+function searchProductsByName(){
+    const input=document.getElementById('productSearchInput');
+    const box=document.getElementById('productSearchResults');
+    const q=normalizeText(input.value);
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    if(!q){
+        box.classList.remove('show');
+        box.innerHTML='';
+        document.querySelectorAll('.product-card').forEach(card=>card.classList.remove('hide-by-search'));
+        return;
+    }
+    const matches=menu.filter(item=>normalizeText(item.name+' '+(item.description||'')+' '+(item.category||'')).includes(q));
+    document.querySelectorAll('.product-card').forEach(card=>{
+        const name=normalizeText(card.dataset.name+' '+card.dataset.category);
+        card.classList.toggle('hide-by-search',!name.includes(q));
+    });
+    box.classList.add('show');
+    if(matches.length===0){box.innerHTML='❌ لا يوجد صنف بهذا الاسم';return}
+    box.innerHTML=matches.map(item=>`<div class="product-result-item"><div><b>${item.name}</b><br><small>${item.category} - ${item.price} جنيه</small></div><button onclick="chooseProductFromSearch(${item.id})">اختيار وطلب</button></div>`).join('');
+}
+function chooseProductFromSearch(id){
+    quantities[id]=1;
+    const qtyBox=document.getElementById('qty-'+id);
+    if(qtyBox) qtyBox.innerText=1;
+    addToCart(id);
+    setCartOpen(true);
+    const card=document.getElementById('product-'+id);
+    if(card) card.scrollIntoView({behavior:'smooth',block:'center'});
+}
+function addFirstSearchResult(){
+    const q=normalizeText(document.getElementById('productSearchInput').value);
+    if(!q){toast('اكتب اسم الصنف أولاً');return}
+    const item=menu.find(item=>normalizeText(item.name+' '+(item.description||'')+' '+(item.category||'')).includes(q));
+    if(!item){toast('لا يوجد صنف بهذا الاسم');return}
+    chooseProductFromSearch(item.id);
+}
 function searchClientOrder(){
     const input=document.getElementById('clientOrderSearch');
     const box=document.getElementById('clientOrderResult');
