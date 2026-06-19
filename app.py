@@ -31,14 +31,7 @@ DEFAULT_MENU = [
 ]
 
 ORDER_STATUSES = ["جديد", "قيد التحضير", "جاهز", "تم التسليم", "ملغي"]
-DEFAULT_CATEGORIES = [
-    ("مشروبات ساخنة", "☕"),
-    ("مشروبات باردة", "🥤"),
-    ("شيشة", "💨"),
-    ("حلويات", "🍰"),
-    ("وجبات خفيفة", "🥪"),
-]
-CATEGORIES = [c[0] for c in DEFAULT_CATEGORIES]
+CATEGORIES = ["مشروبات ساخنة", "مشروبات باردة", "شيشة", "حلويات", "وجبات خفيفة"]
 DEFAULT_IMAGE = "https://images.pexels.com/photos/302899/pexels-photo-302899.jpeg?auto=compress&cs=tinysrgb&w=900"
 
 
@@ -140,30 +133,6 @@ def init_db():
         )
     """)
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS categories (
-            id SERIAL PRIMARY KEY,
-            name TEXT UNIQUE NOT NULL,
-            emoji TEXT DEFAULT '🍽️',
-            active INTEGER DEFAULT 1,
-            created_at TEXT DEFAULT ''
-        )
-    """)
-    # إصلاح قواعد البيانات القديمة: لو جدول categories موجود سابقًا بدون الأعمدة الجديدة
-    add_column_if_missing(cur, "categories", "emoji", "TEXT DEFAULT '🍽️'")
-    add_column_if_missing(cur, "categories", "active", "INTEGER DEFAULT 1")
-    add_column_if_missing(cur, "categories", "created_at", "TEXT DEFAULT ''")
-
-    for category_name, emoji in DEFAULT_CATEGORIES:
-        cur.execute(
-            """
-            INSERT INTO categories (name, emoji, active, created_at)
-            VALUES (%s, %s, 1, %s)
-            ON CONFLICT (name) DO NOTHING
-            """,
-            (category_name, emoji, datetime.now().strftime("%Y-%m-%d %H:%M"))
-        )
-
     cur.execute("SELECT COUNT(*) AS c FROM menu_items")
     if cur.fetchone()["c"] == 0:
         cur.executemany(
@@ -174,17 +143,6 @@ def init_db():
             [(x[0], x[1], x[2], x[3], x[4], x[5], x[6], datetime.now().strftime("%Y-%m-%d %H:%M")) for x in DEFAULT_MENU]
         )
         cur.execute("SELECT setval(pg_get_serial_sequence('menu_items','id'), COALESCE((SELECT MAX(id) FROM menu_items), 1), true)")
-
-    cur.execute("SELECT DISTINCT category FROM menu_items WHERE category IS NOT NULL AND category <> ''")
-    for r in cur.fetchall():
-        cur.execute(
-            """
-            INSERT INTO categories (name, emoji, active, created_at)
-            VALUES (%s, '🍽️', 1, %s)
-            ON CONFLICT (name) DO NOTHING
-            """,
-            (r["category"], datetime.now().strftime("%Y-%m-%d %H:%M"))
-        )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS inventory (
@@ -262,26 +220,6 @@ def get_menu_items(active_only=False):
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
     return rows
-
-
-def get_categories(active_only=True):
-    """إحضار التصنيفات من قاعدة البيانات حتى يستطيع المدير إضافة تصنيفات جديدة."""
-    conn = get_db()
-    cur = conn.cursor()
-    if active_only:
-        cur.execute("SELECT * FROM categories WHERE active = 1 ORDER BY id")
-    else:
-        cur.execute("SELECT * FROM categories ORDER BY id")
-    rows = [dict(r) for r in cur.fetchall()]
-    cur.close()
-    conn.close()
-    return rows
-
-
-def get_category_names(active_only=True):
-    rows = get_categories(active_only=active_only)
-    names = [r["name"] for r in rows]
-    return names or CATEGORIES
 
 
 def get_item_by_id(item_id):
@@ -373,12 +311,10 @@ def format_order_message(order_id, customer_name, order_place, clean_items, tota
 @app.route("/")
 def home():
     menu_items = get_menu_items(active_only=True)
-    categories = get_categories(active_only=True)
     base_url = get_site_base_url()
     return render_template_string(
         HOME_HTML,
         menu=menu_items,
-        categories=categories,
         qr_url=f"{base_url}/qr",
         menu_url=f"{base_url}/",
         default_image=DEFAULT_IMAGE
@@ -440,42 +376,6 @@ def send_order():
         log_action(f"فشل إشعار Telegram للطلب #{order_id}: {telegram_result.get('message', telegram_result)}")
 
     return jsonify({"success": True, "message": "تم إرسال الطلب بنجاح ✅", "order_id": order_id, "total": total, "telegram": telegram_result})
-
-
-
-@app.route("/order-search")
-def order_search():
-    """بحث العميل عن طلبه برقم الطلب وإرجاع الحالة والتفاصيل."""
-    order_id = (request.args.get("order_id") or "").strip().replace("#", "")
-    if not order_id.isdigit():
-        return jsonify({"success": False, "message": "اكتب رقم الطلب بشكل صحيح"})
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM orders WHERE id = %s", (int(order_id),))
-    order = cur.fetchone()
-    if not order:
-        cur.close()
-        conn.close()
-        return jsonify({"success": False, "message": "لم يتم العثور على هذا الطلب"})
-
-    cur.execute("SELECT item_name, qty, price FROM order_items WHERE order_id = %s ORDER BY id", (int(order_id),))
-    items = [dict(r) for r in cur.fetchall()]
-    cur.close()
-    conn.close()
-
-    return jsonify({
-        "success": True,
-        "order": {
-            "id": order["id"],
-            "customer_name": order.get("customer_name") or "عميل",
-            "order_place": order.get("order_place") or order.get("table_number") or "",
-            "total": float(order["total"] or 0),
-            "status": order["status"],
-            "created_at": order["created_at"],
-            "items": items,
-        }
-    })
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -583,10 +483,6 @@ def admin():
     cur.execute("SELECT key, value FROM settings")
     settings = {r["key"]: r["value"] for r in cur.fetchall()}
 
-    cur.execute("SELECT * FROM categories ORDER BY id")
-    category_rows = [dict(r) for r in cur.fetchall()]
-    category_names = [r["name"] for r in category_rows if int(r.get("active") or 0) == 1] or CATEGORIES
-
     conn.close()
 
     base_url = get_site_base_url()
@@ -610,8 +506,7 @@ def admin():
         activity_log=activity_log,
         settings=settings,
         statuses=ORDER_STATUSES,
-        categories=category_names,
-        category_rows=category_rows,
+        categories=CATEGORIES,
         menu_url=f"{base_url}/",
         qr_url=f"{base_url}/qr"
     )
@@ -666,54 +561,6 @@ def safe_price(value):
         return float(value or 0)
     except (TypeError, ValueError):
         return 0
-
-
-
-@app.route("/category/add", methods=["POST"])
-@admin_required
-def category_add():
-    name = (request.form.get("category_name") or "").strip()
-    emoji = (request.form.get("category_emoji") or "🍽️").strip() or "🍽️"
-    if name:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute(
-            """
-            INSERT INTO categories (name, emoji, active, created_at)
-            VALUES (%s, %s, 1, %s)
-            ON CONFLICT (name) DO UPDATE SET emoji = EXCLUDED.emoji, active = 1
-            """,
-            (name, emoji, datetime.now().strftime("%Y-%m-%d %H:%M"))
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
-        log_action(f"إضافة تصنيف جديد: {name}")
-    return redirect(url_for("admin") + "#menu")
-
-
-@app.route("/category/toggle/<int:category_id>")
-@admin_required
-def category_toggle(category_id):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("UPDATE categories SET active = CASE WHEN active = 1 THEN 0 ELSE 1 END WHERE id = %s", (category_id,))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return redirect(url_for("admin") + "#menu")
-
-
-@app.route("/category/delete/<int:category_id>")
-@admin_required
-def category_delete(category_id):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM categories WHERE id = %s", (category_id,))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return redirect(url_for("admin") + "#menu")
 
 
 @app.route("/menu/add", methods=["POST"])
@@ -971,30 +818,6 @@ HOME_HTML = r'''
 @media(max-width:899px){
     .desktop-sidebar{display:none !important;}
 }
-
-.order-search-box{margin:14px 0;background:#fff;border:1px solid var(--line);box-shadow:var(--shadow);border-radius:22px;padding:14px}
-.order-search-box h3{margin:0 0 10px;color:var(--brown);font-size:18px}
-.search-row{display:flex;gap:8px}
-.search-row input{flex:1;border:1px solid var(--line);border-radius:14px;padding:12px;font-family:inherit;background:#fffaf6}
-.search-row button{border:0;border-radius:14px;padding:12px 14px;background:linear-gradient(135deg,#6f3516,#3f1c0a);color:#fff;font-family:inherit;font-weight:900}
-.order-result{display:none;margin-top:10px;background:#fffaf6;border:1px dashed var(--line);border-radius:15px;padding:12px;line-height:1.9}
-.order-result.show{display:block}
-.product-search-box{margin:14px 0;background:#fff;border:1px solid var(--line);box-shadow:var(--shadow);border-radius:22px;padding:14px}
-.product-search-box h3{margin:0 0 10px;color:var(--brown);font-size:18px}
-.product-search-row{display:flex;gap:8px}
-.product-search-row input{flex:1;border:1px solid var(--line);border-radius:14px;padding:12px;font-family:inherit;background:#fffaf6}
-.product-search-row button{border:0;border-radius:14px;padding:12px 14px;background:linear-gradient(135deg,#6f3516,#3f1c0a);color:#fff;font-family:inherit;font-weight:900}
-.product-search-results{display:none;margin-top:10px;background:#fffaf6;border:1px dashed var(--line);border-radius:15px;padding:10px;line-height:1.8;max-height:260px;overflow:auto}
-.product-search-results.show{display:block}
-.product-result-item{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;border-bottom:1px dashed #eaded5;padding:9px 0}
-.product-result-item:last-child{border-bottom:0}
-.product-result-item b{color:var(--brown)}
-.product-result-item small{color:var(--muted)}
-.product-result-item button{border:0;border-radius:12px;padding:9px 11px;background:#5b2b12;color:#fff;font-family:inherit;font-weight:900}
-.product-card.hide-by-search{display:none !important}
-.cart-list{display:none !important;}
-.cart-list.open{display:block !important;}
-.view{white-space:nowrap}
 </style>
 </head>
 <body>
@@ -1009,125 +832,52 @@ HOME_HTML = r'''
     <a class="active" href="/">🏠 المنيو</a>
     <a href="/login">📋 لوحة المدير</a>
     <a href="{{ qr_url }}" target="_blank">▦ QR للطاولة</a>
-    <a href="#orderSearchBox">🔎 بحث عن طلب</a><a href="#productSearchBox">🔍 بحث عن صنف</a><a href="#cartBox" onclick="setCartOpen(true)">🛒 السلة</a>
+    <a href="#cartBox">🛒 السلة</a>
     <div class="side-note">اختر طلبك وحدد مكان التوصيل ثم اضغط إرسال الطلب.</div>
 </aside>
 
-<aside class="mobile-menu" id="mobileMenu"><button class="close-menu" id="closeMenu">×</button><h2>☕ كافيه فرفشة</h2><a href="/">🏠 المنيو</a><a href="/login">📋 لوحة المدير</a><a href="{{ qr_url }}" target="_blank">▦ QR</a><a href="#orderSearchBox" onclick="closeMenu();">🔎 بحث عن طلب</a><a href="#productSearchBox" onclick="closeMenu();">🔍 بحث عن صنف</a><a href="#cartBox" onclick="setCartOpen(true);closeMenu();">🛒 السلة</a></aside>
+<aside class="mobile-menu" id="mobileMenu"><button class="close-menu" id="closeMenu">×</button><h2>☕ كافيه فرفشة</h2><a href="/">🏠 المنيو</a><a href="/login">📋 لوحة المدير</a><a href="{{ qr_url }}" target="_blank">▦ QR</a><a href="#cartBox" onclick="toggleCart();closeMenu();">🛒 السلة</a></aside>
 <header class="header"><button class="icon-btn" id="menuBtn">☰</button><h1>كافيه فرفشة ☕</h1><button class="icon-btn" onclick="toggleCart()">🛒<span class="count" id="cartCount">0</span></button></header>
 <main class="wrap">
 <section class="hero"><div><small>مرحباً بك في</small><h2>كافيه فرفشة 👋</h2><p>اختار طلبك وحدد مكان التوصيل</p></div></section>
-<section class="order-search-box" id="orderSearchBox">
-<h3>🔎 البحث عن طلبك</h3>
-<div class="search-row">
-<input id="clientOrderSearch" inputmode="numeric" placeholder="اكتب رقم الطلب مثال: 15">
-<button onclick="searchClientOrder()">بحث عن الطلب</button>
-</div>
-<div class="order-result" id="clientOrderResult"></div>
-</section>
-<section class="product-search-box" id="productSearchBox">
-<h3>🔍 البحث عن صنف لطلبه</h3>
-<div class="product-search-row">
-<input id="productSearchInput" placeholder="اكتب اسم الصنف مثال: شاي أو قهوة" oninput="searchProductsByName()" onkeydown="if(event.key==='Enter'){event.preventDefault();addFirstSearchResult();}">
-<button onclick="addFirstSearchResult()">إضافة أول نتيجة</button>
-</div>
-<div class="product-search-results" id="productSearchResults"></div>
-</section>
-<nav class="tabs">
-<button class="tab active" onclick="filterCategory('all',this)">الكل</button>
-{% for c in categories %}
-<button class="tab" onclick="filterCategory({{ c.name|tojson }},this)">{{ c.emoji }} {{ c.name }}</button>
-{% endfor %}
-</nav>
-<section class="products">{% for item in menu %}<article id="product-{{ item.id }}" class="product product-card" data-category="{{ item.category }}" data-name="{{ item.name }} {{ item.description }}"><div class="photo"><img src="{{ item.image or default_image }}" onerror="this.onerror=null;this.src='{{ default_image }}';"></div><div class="info"><h3>{{ item.name }}</h3><p class="desc">{{ item.description }}</p><div class="bottom"><div class="price">{{ item.price }} جنيه</div><div class="qty"><button onclick="changeQty({{ item.id }},-1)">-</button><b id="qty-{{ item.id }}">0</b><button onclick="changeQty({{ item.id }},1)">+</button><button class="add" onclick="addToCart({{ item.id }})">🛒</button></div></div></div></article>{% endfor %}</section>
+<nav class="tabs"><button type="button" class="tab active" data-category="all" onclick="filterCategory('all',this)">الكل</button><button class="tab" onclick="filterCategory('مشروبات ساخنة',this)">☕ ساخنة</button><button class="tab" onclick="filterCategory('مشروبات باردة',this)">🥤 باردة</button><button class="tab" onclick="filterCategory('شيشة',this)">💨 شيشة</button><button class="tab" onclick="filterCategory('حلويات',this)">🍰 حلويات</button><button class="tab" onclick="filterCategory('وجبات خفيفة',this)">🥪 خفيفة</button></nav>
+<section class="products">{% for item in menu %}<article class="product product-card" data-category="{{ item.category }}"><div class="photo"><img src="{{ item.image }}"></div><div class="info"><h3>{{ item.name }}</h3><p class="desc">{{ item.description }}</p><div class="bottom"><div class="price">{{ item.price }} جنيه</div><div class="qty"><button onclick="changeQty({{ item.id }},-1)">-</button><b id="qty-{{ item.id }}">0</b><button onclick="changeQty({{ item.id }},1)">+</button><button class="add" onclick="addToCart({{ item.id }})">🛒</button></div></div></div></article>{% endfor %}</section>
 </main>
-<section class="drawer" id="cartBox"><div class="summary"><div><b>الإجمالي</b><br><span id="totalPrice">0</span> جنيه</div><div><button class="view" id="cartToggleBtn" onclick="toggleCart()">عرض & إخفاء السلة</button><button class="send" onclick="sendOrder()">إرسال الطلب</button></div></div><div class="cart-list" id="cartList"><div class="form-box"><label>اسم صاحب الطلب</label><input id="customerName" placeholder="مثال: أحمد محمد"></div><div class="form-box"><label>نوع المكان</label><select id="placeType" onchange="updatePlaceOptions()"><option value="">اختر نوع المكان</option><option value="admin">النيابة الإدارية</option><option value="cafe">الكافيه</option></select></div><div class="form-box"><label>مكان الطلب</label><select id="orderPlace"><option value="">اختر نوع المكان أولاً</option></select></div><div id="cartItems"></div><button class="view" style="width:100%" onclick="clearCart()">مسح الطلب</button></div></section>
+<section class="drawer" id="cartBox"><div class="summary"><div><b>الإجمالي</b><br><span id="totalPrice">0</span> جنيه</div><div><button class="view" onclick="toggleCart()">عرض</button><button class="send" onclick="sendOrder()">إرسال</button></div></div><div class="cart-list" id="cartList"><div class="form-box"><label>اسم صاحب الطلب</label><input id="customerName" placeholder="مثال: أحمد محمد"></div><div class="form-box"><label>نوع المكان</label><select id="placeType" onchange="updatePlaceOptions()"><option value="">اختر نوع المكان</option><option value="admin">النيابة الإدارية</option><option value="cafe">الكافيه</option></select></div><div class="form-box"><label>مكان الطلب</label><select id="orderPlace"><option value="">اختر نوع المكان أولاً</option></select></div><div id="cartItems"></div><button class="view" style="width:100%" onclick="clearCart()">مسح الطلب</button></div></section>
 <script>
 const menu={{ menu|tojson }};let quantities={};let cart=[];
 function toast(m){let t=document.getElementById('toast');t.innerText=m;t.style.display='block';setTimeout(()=>t.style.display='none',1800)}
 function openMenu(){document.getElementById('mobileMenu').classList.add('show');document.getElementById('overlay').classList.add('show')}function closeMenu(){document.getElementById('mobileMenu').classList.remove('show');document.getElementById('overlay').classList.remove('show')}
-document.addEventListener('DOMContentLoaded',()=>{document.getElementById('menuBtn').onclick=openMenu;document.getElementById('closeMenu').onclick=closeMenu;document.getElementById('overlay').onclick=closeMenu});
-function setCartOpen(isOpen){const list=document.getElementById('cartList');if(isOpen){list.classList.add('open')}else{list.classList.remove('open')}}
+document.addEventListener('DOMContentLoaded',()=>{document.getElementById('menuBtn').onclick=openMenu;document.getElementById('closeMenu').onclick=closeMenu;document.getElementById('overlay').onclick=closeMenu;document.querySelectorAll('.tab').forEach(btn=>{btn.addEventListener('click',function(e){e.preventDefault();filterCategory(this.dataset.category||'all',this);});});});
 function toggleCart(){document.getElementById('cartList').classList.toggle('open')}
 function updatePlaceOptions(){let type=document.getElementById('placeType').value;let p=document.getElementById('orderPlace');p.innerHTML='';if(type==='admin'){['الدور الأرضي','الأول علوي','الثاني علوي','الثالث علوي','الرابع علوي'].forEach(f=>p.innerHTML+=`<option value="النيابة الإدارية - ${f}">النيابة الإدارية - ${f}</option>`)}else if(type==='cafe'){for(let i=1;i<=20;i++){p.innerHTML+=`<option value="الكافيه - طاولة رقم ${i}">الكافيه - طاولة رقم ${i}</option>`}}else{p.innerHTML='<option value="">اختر نوع المكان أولاً</option>'}}
 function filterCategory(c,b){
-    // إصلاح مهم: عند الضغط على أي تصنيف يتم إلغاء تأثير البحث السابق
+    // إصلاح فلتر التصنيفات: يمسح تأثير البحث أولاً ثم يقارن التصنيف بشكل آمن
+    const selected = normalizeText(c || 'all');
+
     const searchInput = document.getElementById('productSearchInput');
     const searchBox = document.getElementById('productSearchResults');
-
-    if(searchInput){ searchInput.value = ''; }
+    if(searchInput) searchInput.value = '';
     if(searchBox){
         searchBox.classList.remove('show');
         searchBox.innerHTML = '';
     }
 
     document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-    if(b){ b.classList.add('active'); }
+    if(b) b.classList.add('active');
 
     document.querySelectorAll('.product-card').forEach(card=>{
         card.classList.remove('hide-by-search');
-        const itemCategory = (card.dataset.category || '').trim();
-        card.style.display = (c === 'all' || itemCategory === c) ? 'grid' : 'none';
+        const cardCategory = normalizeText(card.getAttribute('data-category') || '');
+        const show = selected === 'all' || selected === 'الكل' || cardCategory === selected;
+        card.style.setProperty('display', show ? 'grid' : 'none', 'important');
     });
 }
 function changeQty(id,d){quantities[id]=(quantities[id]||0)+d;if(quantities[id]<0)quantities[id]=0;document.getElementById('qty-'+id).innerText=quantities[id]}
 function addToCart(id){let q=quantities[id]||0;if(q<=0){toast('اختار الكمية أولاً');return}let item=menu.find(x=>x.id===id);let ex=cart.find(x=>x.id===id);if(ex){ex.qty+=q}else{cart.push({id:item.id,name:item.name,price:item.price,qty:q})}quantities[id]=0;document.getElementById('qty-'+id).innerText=0;renderCart();toast('تمت الإضافة')}
 function renderCart(){let box=document.getElementById('cartItems');let total=0,count=0;box.innerHTML='';if(cart.length===0)box.innerHTML='<p>لا يوجد طلبات حالياً</p>';cart.forEach((it,i)=>{total+=it.price*it.qty;count+=it.qty;box.innerHTML+=`<div class="cart-item"><div>${it.name}</div><b>${it.qty}</b><div>${it.price*it.qty}</div><button class="remove" onclick="removeItem(${i})">×</button></div>`});document.getElementById('totalPrice').innerText=total;document.getElementById('cartCount').innerText=count}
 function removeItem(i){cart.splice(i,1);renderCart()}function clearCart(){cart=[];renderCart()}
-function normalizeText(v){return (v||'').toString().toLowerCase().replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').trim()}
-function searchProductsByName(){
-    const input=document.getElementById('productSearchInput');
-    const box=document.getElementById('productSearchResults');
-    const q=normalizeText(input.value);
-    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-    if(!q){
-        box.classList.remove('show');
-        box.innerHTML='';
-        document.querySelectorAll('.product-card').forEach(card=>card.classList.remove('hide-by-search'));
-        return;
-    }
-    const matches=menu.filter(item=>normalizeText(item.name+' '+(item.description||'')+' '+(item.category||'')).includes(q));
-    document.querySelectorAll('.product-card').forEach(card=>{
-        const name=normalizeText(card.dataset.name+' '+card.dataset.category);
-        card.classList.toggle('hide-by-search',!name.includes(q));
-    });
-    box.classList.add('show');
-    if(matches.length===0){box.innerHTML='❌ لا يوجد صنف بهذا الاسم';return}
-    box.innerHTML=matches.map(item=>`<div class="product-result-item"><div><b>${item.name}</b><br><small>${item.category} - ${item.price} جنيه</small></div><button onclick="chooseProductFromSearch(${item.id})">اختيار وطلب</button></div>`).join('');
-}
-function chooseProductFromSearch(id){
-    quantities[id]=1;
-    const qtyBox=document.getElementById('qty-'+id);
-    if(qtyBox) qtyBox.innerText=1;
-    addToCart(id);
-    setCartOpen(true);
-    const card=document.getElementById('product-'+id);
-    if(card) card.scrollIntoView({behavior:'smooth',block:'center'});
-}
-function addFirstSearchResult(){
-    const q=normalizeText(document.getElementById('productSearchInput').value);
-    if(!q){toast('اكتب اسم الصنف أولاً');return}
-    const item=menu.find(item=>normalizeText(item.name+' '+(item.description||'')+' '+(item.category||'')).includes(q));
-    if(!item){toast('لا يوجد صنف بهذا الاسم');return}
-    chooseProductFromSearch(item.id);
-}
-function searchClientOrder(){
-    const input=document.getElementById('clientOrderSearch');
-    const box=document.getElementById('clientOrderResult');
-    const orderId=(input.value||'').trim().replace('#','');
-    if(!orderId){box.classList.add('show');box.innerHTML='⚠️ اكتب رقم الطلب أولاً';return}
-    box.classList.add('show');box.innerHTML='جاري البحث...';
-    fetch('/order-search?order_id='+encodeURIComponent(orderId))
-    .then(r=>r.json())
-    .then(d=>{
-        if(!d.success){box.innerHTML='❌ '+(d.message||'لم يتم العثور على الطلب');return}
-        const o=d.order;
-        let items=(o.items||[]).map(i=>`• ${i.item_name} × ${i.qty}`).join('<br>');
-        box.innerHTML=`<b>طلب رقم #${o.id}</b><br>👤 ${o.customer_name}<br>📍 ${o.order_place}<br>📌 الحالة: <b>${o.status}</b><br>💰 الإجمالي: ${o.total} جنيه<br><hr>${items}`;
-    })
-    .catch(()=>{box.innerHTML='حدث خطأ أثناء البحث'});
-}
-function sendOrder(){if(cart.length===0){toast('السلة فارغة');return}let customerName=document.getElementById('customerName').value.trim();let orderPlace=document.getElementById('orderPlace').value;if(!customerName){toggleCart();toast('اكتب اسم صاحب الطلب');return}if(!orderPlace){toggleCart();toast('اختر مكان الطلب');return}fetch('/send-order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer_name:customerName,order_place:orderPlace,cart:cart})}).then(r=>r.json()).then(d=>{toast(d.message);if(d.success){alert('✅ تم إرسال الطلب بنجاح\nرقم طلبك: #' + d.order_id + '\nيمكنك البحث عنه من زر بحث عن الطلب');clearCart();document.getElementById('customerName').value='';document.getElementById('cartList').classList.remove('open')}})}renderCart();
+function sendOrder(){if(cart.length===0){toast('السلة فارغة');return}let customerName=document.getElementById('customerName').value.trim();let orderPlace=document.getElementById('orderPlace').value;if(!customerName){toggleCart();toast('اكتب اسم صاحب الطلب');return}if(!orderPlace){toggleCart();toast('اختر مكان الطلب');return}fetch('/send-order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer_name:customerName,order_place:orderPlace,cart:cart})}).then(r=>r.json()).then(d=>{toast(d.message);if(d.success){alert('✅ تم إرسال الطلب');clearCart();document.getElementById('customerName').value='';document.getElementById('cartList').classList.remove('open')}})}renderCart();
 </script></body></html>
 '''
 
@@ -1142,20 +892,7 @@ ADMIN_HTML = r'''
 <section id="dashboard" class="section active"><div class="grid2"><div class="panel"><h3>إحصائيات المبيعات</h3><canvas id="salesChart"></canvas></div><div class="panel"><h3>حالات الطلبات</h3><canvas id="statusChart"></canvas></div></div><div class="grid3"><div class="panel"><h3>طلبات جديدة قيد الانتظار</h3><b style="font-size:36px;color:var(--brown)">{{ waiting_orders }}</b></div><div class="panel"><h3>المبيعات الشهرية</h3><b style="font-size:36px;color:var(--brown)">{{ sales_month }}</b> جنيه</div><div class="panel"><h3>الأماكن النشطة</h3><b style="font-size:36px;color:var(--brown)">{{ active_places }}</b></div></div></section>
 <section id="orders" class="section"><div class="panel"><h3>إدارة الطلبات</h3><div class="filters"><input id="orderSearch" onkeyup="filterOrders()" placeholder="بحث برقم الطلب أو اسم العميل أو المكان"><select id="placeFilter" onchange="filterOrders()"><option value="">كل الأماكن</option><option>النيابة الإدارية</option><option>الكافيه</option></select><select id="statusFilter" onchange="filterOrders()"><option value="">كل الحالات</option>{% for st in statuses %}<option>{{ st }}</option>{% endfor %}</select></div><div class="table-wrap"><table id="ordersTable"><thead><tr><th>رقم</th><th>العميل</th><th>المكان</th><th>الوقت</th><th>العناصر</th><th>الإجمالي</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>{% for o in orders %}<tr data-status="{{ o.status }}"><td>#{{ o.id }}</td><td><b>{{ o.customer_name }}</b></td><td>{{ o.order_place }}</td><td>{{ o.created_at }}</td><td>{% for i in o.order_items %}• {{ i.item_name }} × {{ i.qty }}<br>{% endfor %}</td><td><b>{{ o.total }}</b> جنيه</td><td><span class="badge {% if o.status=='جديد' %}badge-new{% elif o.status=='قيد التحضير' %}badge-work{% elif o.status=='جاهز' %}badge-ready{% elif o.status=='تم التسليم' %}badge-done{% else %}badge-cancel{% endif %}">{{ o.status }}</span></td><td>{% for st in statuses %}<a class="btn btn-blue" href="/update-status/{{ o.id }}/{{ st }}">{{ st }}</a> {% endfor %}<a class="btn btn-brown" target="_blank" href="/invoice/{{ o.id }}">طباعة</a> <a class="btn btn-red" onclick="return confirm('حذف الطلب؟')" href="/delete-order/{{ o.id }}">حذف</a></td></tr>{% endfor %}</tbody></table></div></div></section>
 <section id="places" class="section"><div class="panel"><h3>إدارة أماكن الطلب</h3><div class="grid2"><div><h4>النيابة الإدارية</h4><div class="mini-card">الدور الأرضي</div><div class="mini-card">الأول علوي</div><div class="mini-card">الثاني علوي</div><div class="mini-card">الثالث علوي</div><div class="mini-card">الرابع علوي</div></div><div><h4>الكافيه</h4>{% for n in range(1,21) %}<span class="badge badge-work">طاولة {{ n }}</span> {% endfor %}</div></div><p class="muted">استخدم فلتر المكان في إدارة الطلبات لعرض الطلبات حسب المكان.</p></div></section>
-<section id="menu" class="section"><div class="panel"><h3>إدارة المنيو والتصنيفات</h3>
-<div class="panel" style="background:#fffaf6;margin-bottom:16px">
-<h3>➕ إضافة تصنيف جديد</h3>
-<form method="post" action="/category/add" class="grid3">
-<input name="category_name" placeholder="اسم التصنيف الجديد مثال: عصائر طبيعية" required>
-<input name="category_emoji" placeholder="رمز التصنيف مثال: 🥭" value="🍽️">
-<button class="btn-brown">إضافة التصنيف</button>
-</form>
-<div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>التصنيف</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>
-{% for c in category_rows %}
-<tr><td>{{ c.emoji }} <b>{{ c.name }}</b></td><td>{{ 'ظاهر' if c.active else 'مخفي' }}</td><td><a class="btn btn-orange" href="/category/toggle/{{ c.id }}">إظهار/إخفاء</a> <a class="btn btn-red" onclick="return confirm('حذف التصنيف؟ لن يحذف الأصناف الموجودة داخله')" href="/category/delete/{{ c.id }}">حذف التصنيف</a></td></tr>
-{% endfor %}
-</tbody></table></div>
-</div>
+<section id="menu" class="section"><div class="panel"><h3>إدارة المنيو</h3>
 <form method="post" action="/menu/add" class="grid3">
 <input name="name" placeholder="اسم الصنف" required>
 <input name="price" type="number" step="0.01" placeholder="السعر" required>
